@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chat App</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    #chat-container {
+      display: flex;
+      flex-direction: column; /* Ensure messages stack vertically */
+      align-items: flex-start; /* Align messages to the start (left) */
+    }
+
+    .message-container {
+      margin-bottom: 10px;
+      max-width: 70%;
+      word-wrap: break-word; /* Wrap long words */
+      padding: 10px;
+      border-radius: 5px;
+    }
+
+    .message-left {
+      align-self: flex-start; /* Align left-aligned messages to the start (left) */
+      background-color: #dff0d8; /* Green background for user 1's messages */
+    }
+
+    .message-right {
+      align-self: flex-end; /* Align right-aligned messages to the end (right) */
+      background-color: #d9edf7; /* Blue background for user 2's messages */
+    }
+
+    #message-input {
+      width: calc(100% - 180px); /* Adjusted width for the input field to accommodate the buttons */
+      padding: 10px;
+      margin-right: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    .button-container {
+      display: flex;
+      align-items: center;
+    }
+    #send-button, #send-private-button {
+      padding: 10px;
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+<div id="chat-container">
+</div>
+<div class="button-container">
+  <input type="text" id="message-input" placeholder="Type your message">
+  <button id="send-button" onclick="sendMessage()">Send</button>
+  <button id="send-private-button" onclick="sendMessagePrivate()">Send Private</button> <!-- New "Send Private" button -->
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+<script>
+  const spaceId = 'space_first'
+  const socket = new SockJS('http://localhost:3000/socket/chat');
+  const stompClient = Stomp.over(socket);
+  stompClient.connect({}, function (frame) {
+    localStorage.setItem("username", frame.headers['user-name']);
+    stompClient.subscribe('/topic/messages', function (message) {
+      console.log('Received message:', message.body);
+      showMessage(message);
+    });
+    stompClient.subscribe('/user/queue/' + spaceId + '.private.messages', function (message) {
+      console.log('Received message:', message.body);
+      showMessage(message);
+    });
+  });
+
+  function sendMessage() {
+    const messageInput = document.getElementById('message-input');
+    const message = messageInput.value.trim();
+    if (message !== '') {
+      stompClient.send("/app/chat", {}, JSON.stringify({ message: message }));
+      messageInput.value = '';
+    }
+  }
+
+  function sendMessagePrivate() {
+    const messageInput = document.getElementById('message-input');
+    const message = messageInput.value.trim();
+    let chatSpaceMessage = {
+      message: message,
+      spaceId: spaceId,
+      fromUsername: localStorage.getItem("username"),
+      toUsername: 'vardanmt@gmail.com'
+    };
+    if (message !== '') {
+      stompClient.send("/app/space.message", {}, JSON.stringify(chatSpaceMessage));
+      messageInput.value = '';
+    }
+  }
+
+  function showMessage(message) {
+    const json = JSON.parse(message.body);
+    const messageContainer = document.getElementById('chat-container');
+    const div = document.createElement('div');
+    div.classList.add('message-container');
+    // console.log('sender ' + json.body.sessionId)
+    console.log('json ' + json)
+    console.log('json fromUsername ' + json.fromUsername)
+    console.log('json message ' + json.message)
+    console.log('getSender() ' + getSender())
+
+    if (json.fromUsername === getSender()) {
+      div.classList.add('message-left');
+    } else {
+      div.classList.add('message-right');
+      div.classList.add('right');
+    }
+    div.innerHTML = json.message;
+    messageContainer.appendChild(div);
+    // Scroll to the bottom of the chat container
+    messageContainer.scrollTop = messageContainer.scrollHeight;
+  }
+
+  function  getSender() {
+    return localStorage.getItem("username");
+  }
+
+
+</script>
+
+</body>
+</html>
